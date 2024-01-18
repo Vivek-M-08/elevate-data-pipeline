@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ScalaCompilerConfiguration">
+    <profile name="Maven 2" modules="elevate-mentoring,ml-user-delete,program-user-info" />
+    <profile name="Maven 3" modules="elevate-data-pipeline">
+      <parameters>
+        <parameter value="-dependencyfile" />
+        <parameter value="$PROJECT_DIR$/target/.scala_dependencies" />
+        <parameter value="-nobootcp" />
+      </parameters>
+    </profile>
+    <profile name="Maven 4" modules="generic-jobs">
+      <parameters>
+        <parameter value="-dependencyfile" />
+        <parameter value="$PROJECT_DIR$/generic-jobs/target/.scala_dependencies" />
+        <parameter value="-nobootcp" />
+      </parameters>
+    </profile>
+  </component>
+</project>
