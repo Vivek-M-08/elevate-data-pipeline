@@ -4,17 +4,21 @@ import org.apache.log4j.{Level, Logger}
 import org.apache.spark.sql.{DataFrame, Encoders, SparkSession}
 import org.shikshalokam.job.mentoring.functions.mentoringFunction2
 
+import java.time.Instant
 import java.util.Properties
 
 class mentoringExecution2(table_name: String, script_type: String) extends mentoringFunction2 {
 
   def process(): Unit = {
 
+    val startTime = Instant.now()
+    println("Process Start time "+ startTime)
+
     val configProperties: Properties = new Properties()
     configProperties.load(getClass.getResourceAsStream("/application.properties"))
     val dbUser: String = configProperties.getProperty("db.user")
     val dbPassword: String = configProperties.getProperty("db.password")
-    val inputDatabase: String = configProperties.getProperty("input.database")
+    val inputDatabase: String = configProperties.getProperty("database")
     val url: String = configProperties.getProperty("url")
     val query = s"SELECT * FROM $table_name WHERE script_type = '$script_type'"
 
@@ -23,6 +27,9 @@ class mentoringExecution2(table_name: String, script_type: String) extends mento
       .config("spark.master", "local[2]")
       .getOrCreate()
 
+    println(inputDatabase)
+    println(url)
+    println(query)
 
 
     val config_df: DataFrame = readFromPostgres(url, inputDatabase, query, dbUser, dbPassword, spark)
@@ -62,6 +69,8 @@ class mentoringExecution2(table_name: String, script_type: String) extends mento
       println(inputData)
       processScriptLevelData(inputData, MappingData, outputData, spark: SparkSession)
     }
+    val endTime = Instant.now()
+    println("Process End time " + endTime)
   }
 
 }

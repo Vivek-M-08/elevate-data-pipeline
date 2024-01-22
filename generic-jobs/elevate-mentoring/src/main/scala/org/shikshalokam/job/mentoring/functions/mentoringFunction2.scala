@@ -16,6 +16,7 @@ abstract class mentoringFunction2 {
   val dbUser: String = configProperties.getProperty("db.user")
   val dbPassword: String = configProperties.getProperty("db.password")
   val url: String = configProperties.getProperty("url")
+  val dataBase: String = configProperties.getProperty("database")
 
   def readFromPostgres(url: String, database: String, query: String, user: String, password: String, spark: SparkSession): DataFrame = {
     spark.read.format("jdbc")
@@ -157,6 +158,15 @@ abstract class mentoringFunction2 {
       val join_type = singleProcessData("join_type").str
       val substitutedQuery = query.replace("${id}", value.toString)
 
+      println(s"input = $value \n" +
+        s"query = $query \n" +
+        s"databaseName = $databaseName \n" +
+        s"agg = $agg \n" +
+        s"agg_on = $agg_on \n" +
+        s"join_on = $join_on \n" +
+        s"join_type = $join_type \n" +
+        s"substitutedQuery = $substitutedQuery \n")
+
 
       // Spark process to read data from JDBC source
       if (agg != "none" & agg_on != "none") {
@@ -178,27 +188,28 @@ abstract class mentoringFunction2 {
         ProcessResult(singleProcessDf, join_type, join_on)
       }
       else {
-        //        println("+++++++++++++  INSIDE ELSE OF singleProcess    +++++++++++++++++++\n")
+        println("+++++++++++++  INSIDE ELSE OF singleProcess    +++++++++++++++++++\n")
         var singleProcessDf = readFromPostgres(url, databaseName, substitutedQuery, dbUser, dbPassword, spark)
+        singleProcessDf.show(false)
         singleProcessDf = singleProcessDf.na.fill(0)
-        //singleProcessDf.show(false)
+        singleProcessDf.show(false)
+
+        println(singleProcessDf.count)
+        if (singleProcessDf.count == 0) {
+          // Create a new DataFrame with a single column "response" and value 0
+          val newSchema = StructType(Array(StructField(agg_on, IntegerType, true: Boolean)))
+          println(newSchema)
+          val newData = Seq(Row(0))
+          println(newData)
+          val newRdd = spark.sparkContext.parallelize(newData)
+          println(newRdd)
+          singleProcessDf = spark.createDataFrame(newRdd, newSchema)
+        }
         singleProcessDf = singleProcessDf.withColumn(input, lit(value))
-        //singleProcessDf.show(false)
+        singleProcessDf.show(false)
         ProcessResult(singleProcessDf, join_type, join_on)
       }
       //TODO: Throw an exception saying query failed with no data
-      //      if (singleProcessDf.count == 0) {
-      //        // Create a new DataFrame with a single column "response" and value 0
-      //        val newSchema = StructType(Array(StructField(agg_on, IntegerType, true: Boolean)))
-      //        val newData = Seq(Row(0))
-      //        val newRdd = spark.sparkContext.parallelize(newData)
-      //        singleProcessDf = spark.createDataFrame(newRdd, newSchema)
-      //      }
-
-      //      singleProcessDf = singleProcessDf.withColumn(input, lit(value))
-      //      singleProcessDf.show()
-      //      singleProcessDf
-
     } catch {
       case e: Exception =>
         println(s"Error processing Spark DataFrame: ${e.getMessage}")
@@ -274,7 +285,7 @@ abstract class mentoringFunction2 {
     df.write
       .mode("append") // Change to "append" if needed
       .option("driver", "org.postgresql.Driver")
-      .jdbc(s"${url}/elevate_sink_data", "session_report_sink", properties)
+      .jdbc(s"${url}/${dataBase}", "mentee_report_sink", properties)
   }
 
 
