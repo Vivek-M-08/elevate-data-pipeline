@@ -3,6 +3,7 @@ package org.shikshalokam.job.mentoring.functions
 import org.apache.spark.sql.functions.{col, concat_ws, lit, round, sum}
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import ujson.Value.JsonableString
 
 import java.util.Properties
 import scala.util.{Failure, Success, Try}
@@ -52,7 +53,7 @@ abstract class mentoringFunction2 {
           println("\n\n\n\n\n")
           dataMappingDf.show(false)
           outputMappingDf.show(false)
-          writeDataToPostgres(outputMappingDf)
+          writeDataToPostgres(outputMappingDf, outputData)
         }
       }
 
@@ -250,26 +251,28 @@ abstract class mentoringFunction2 {
   def outputMappingProcess(df: DataFrame, output_mapping: ujson.Obj): DataFrame = {
 
     // Fetch keys from the dictionary
-    val keys = output_mapping.obj.keys.toSeq
+    val output_columns = output_mapping("mapping_columns")
+    val keys = output_columns.obj.keys.toSeq
     println(keys)
     println("inside outputMappingProcess method")
 
     // Select columns from the original DataFrame based on the keys
     var selectedColumnsDF = df.select(keys.map(col): _*)
     selectedColumnsDF.show(false)
-    println(selectedColumnsDF)
 
-    output_mapping.obj.keys.foreach { column_name =>
+    output_columns.obj.keys.foreach { column_name =>
+
       println(column_name)
       println(selectedColumnsDF.schema(column_name).dataType)
-      println(output_mapping(column_name)("Input_data_type").str)
-      if ((selectedColumnsDF.schema(column_name).dataType).toString == output_mapping(column_name)("Input_data_type").str) {
-        if (output_mapping(column_name)("Input_data_type").str == "ArrayType(StringType,true)") {
+      println(output_columns(column_name)("Input_data_type").str)
+
+      if (selectedColumnsDF.schema(column_name).dataType.toString == output_columns(column_name)("Input_data_type").str) {
+        if (output_columns(column_name)("Input_data_type").str == "ArrayType(StringType,true)") {
           selectedColumnsDF = selectedColumnsDF.withColumn(column_name, concat_ws(", ", col(column_name)))
         }
-        selectedColumnsDF = selectedColumnsDF.withColumnRenamed(column_name, output_mapping(column_name)("rename").str)
+        selectedColumnsDF = selectedColumnsDF.withColumnRenamed(column_name, output_columns(column_name)("rename").str)
       } else {
-        println("data_type_not_matches")
+        println("data_type_mismatch")
       }
     }
     selectedColumnsDF.show(false)
@@ -277,7 +280,10 @@ abstract class mentoringFunction2 {
   }
 
 
-  def writeDataToPostgres(df: DataFrame): Unit = {
+  def writeDataToPostgres(df: DataFrame, outputData: ujson.Obj): Unit = {
+
+    val databaseName = outputData("database").str
+    val tableName = outputData("table").str
     val properties = new Properties()
     properties.setProperty("user", dbUser)
     properties.setProperty("password", dbPassword)
@@ -285,7 +291,7 @@ abstract class mentoringFunction2 {
     df.write
       .mode("append") // Change to "append" if needed
       .option("driver", "org.postgresql.Driver")
-      .jdbc(s"${url}/${dataBase}", "mentee_report_sink", properties)
+      .jdbc(s"${url}/${databaseName}", s"${tableName}", properties)
   }
 
 
